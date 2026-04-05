@@ -96,9 +96,15 @@ pub fn compute_standings(teams: &[Team], games: &[Game], season: u32) -> Standin
         })
         .collect();
 
-    // Tally wins and losses from completed games
+    // Tally wins and losses from completed regular-season games
     for game in games {
         if game.status != "STATUS_FINAL" {
+            continue;
+        }
+
+        // Defensive filter: only count regular-season games for standings,
+        // in case spring training or postseason games slip through.
+        if game.season_type.as_deref() != Some("regular") {
             continue;
         }
 
@@ -424,6 +430,57 @@ mod tests {
 
         assert_eq!(nyy.wins, 0);
         assert_eq!(nyy.losses, 0);
+    }
+
+    #[test]
+    fn non_regular_season_games_are_ignored() {
+        let yankees = al_east_team(1, "Yankees", "NYY");
+        let redsox = al_east_team(2, "Red Sox", "BOS");
+
+        // Spring training game (STATUS_FINAL but wrong season_type)
+        let mut spring = make_game(100, &yankees, &redsox, Some(5), Some(3), "STATUS_FINAL");
+        spring.season_type = Some("spring_training".to_string());
+
+        // Postseason game
+        let mut postseason = make_game(101, &yankees, &redsox, Some(4), Some(2), "STATUS_FINAL");
+        postseason.season_type = Some("postseason".to_string());
+
+        // Game with no season_type
+        let mut no_type = make_game(102, &yankees, &redsox, Some(6), Some(1), "STATUS_FINAL");
+        no_type.season_type = None;
+
+        // Regular season game (should be counted)
+        let regular = make_game(103, &yankees, &redsox, Some(3), Some(2), "STATUS_FINAL");
+
+        let games = vec![spring, postseason, no_type, regular];
+        let standings = compute_standings(&[yankees, redsox], &games, 2025);
+        let al_east = standings
+            .divisions
+            .iter()
+            .find(|d| d.name == "AL East")
+            .unwrap();
+        let nyy = al_east
+            .teams
+            .iter()
+            .find(|r| r.team.abbreviation == "NYY")
+            .unwrap();
+        let bos = al_east
+            .teams
+            .iter()
+            .find(|r| r.team.abbreviation == "BOS")
+            .unwrap();
+
+        // Only the regular-season game should count
+        assert_eq!(
+            nyy.wins, 1,
+            "Yankees should have 1 win from the regular game"
+        );
+        assert_eq!(nyy.losses, 0);
+        assert_eq!(bos.wins, 0);
+        assert_eq!(
+            bos.losses, 1,
+            "Red Sox should have 1 loss from the regular game"
+        );
     }
 
     #[test]
