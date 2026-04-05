@@ -357,7 +357,7 @@ impl BallDontLieClient {
                 .header("Authorization", &self.api_key)
                 .query(&[
                     ("seasons[]", season.to_string()),
-                    ("postseason", "false".to_string()),
+                    ("season_type", "regular".to_string()),
                     ("per_page", PER_PAGE.to_string()),
                     ("start_date", start_date.to_string()),
                     ("end_date", end_date.to_string()),
@@ -414,10 +414,10 @@ impl BallDontLieClient {
 /// Split an MLB season into date ranges for parallel fetching.
 ///
 /// The MLB regular season runs from late March to early October (~200 game days).
-/// We use March 1 to October 31 to capture the full window including any early
-/// spring training games that leak into regular season and late-season schedule
-/// extensions. The `postseason=false` query param filters out playoff games,
-/// but narrowing the date range reduces the total number of API pages returned.
+/// We use March 1 to October 31 to capture the full window including late-season
+/// schedule extensions. The `season_type=regular` query param filters out both
+/// spring training and postseason games at the API level, so the date range only
+/// needs to be wide enough to cover the regular season.
 ///
 /// We split this into RATE_LIMIT_BATCH_SIZE ranges so we can fetch the first
 /// page of each concurrently within a single rate-limit window.
